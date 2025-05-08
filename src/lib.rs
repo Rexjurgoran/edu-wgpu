@@ -2,7 +2,7 @@ mod texture;
 
 use wgpu::util::DeviceExt;
 use winit::{
-    event::*,
+    event::{*},
     event_loop::EventLoop,
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
@@ -112,6 +112,94 @@ impl CameraUniform {
     }
 }
 
+struct CameraController {
+    speed: f32,
+    is_forward_pressed: bool,
+    is_backward_pressed: bool,
+    is_left_pressed: bool,
+    is_right_pressed: bool,
+}
+
+impl CameraController {
+    pub fn new(speed: f32) -> Self {
+        Self {
+            speed,
+            is_forward_pressed: false,
+            is_backward_pressed: false,
+            is_left_pressed: false,
+            is_right_pressed: false,
+        }
+    }
+
+    pub fn process_events(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state,
+                        physical_key: PhysicalKey::Code(keycode),
+                        ..
+                    },
+                ..
+            } => {
+                let is_pressed = *state == ElementState::Pressed;
+                match keycode {
+                    KeyCode::KeyW | KeyCode::ArrowUp => {
+                        self.is_forward_pressed = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyA | KeyCode::ArrowLeft => {
+                        self.is_left_pressed = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyS | KeyCode::ArrowDown => {
+                        self.is_backward_pressed = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyD | KeyCode::ArrowRight => {
+                        self.is_right_pressed = is_pressed;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn update_camera(&self, camera: &mut Camera) {
+        use cgmath::InnerSpace;
+        let forward = camera.target - camera.eye;
+        let forward_norm = forward.normalize();
+        let forward_mag = forward.magnitude();
+
+        // Prevents glitching when the camera gets too close to the
+        // center of the scene.
+        if self.is_forward_pressed && forward_mag > self.speed {
+            camera.eye += forward_norm * self.speed;
+        }
+        if self.is_backward_pressed {
+            camera.eye -= forward_norm * self.speed;
+        }
+
+        let right = forward_norm.cross(camera.up);
+
+        // Redo radios calc in case the forward/backward is pressed.
+        let forward = camera.target - camera.eye;
+        let forward_mag = forward.magnitude();
+
+        if self.is_right_pressed {
+            // Rescale the distance between the target and the eye so 
+            // that it doesn't change. The eye, therefore, still
+            // lies on the circle made by the target and eye.
+            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+        }
+        if self.is_left_pressed {
+            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+        }
+    }
+}
+
 struct State<'a> {
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
@@ -126,6 +214,7 @@ struct State<'a> {
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
     camera: Camera,
+    camera_controller: CameraController,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -293,6 +382,8 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
+        let camera_controller = CameraController::new(0.2);
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
@@ -374,6 +465,7 @@ impl<'a> State<'a> {
             diffuse_bind_group,
             diffuse_texture,
             camera,
+            camera_controller,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -393,12 +485,19 @@ impl<'a> State<'a> {
         }
     }
 
-    fn input(&mut self, _event: &WindowEvent) -> bool {
-        false
+    fn input(&mut self, event: &WindowEvent) -> bool {
+        self.camera_controller.process_events(event)
     }
 
     fn update(&mut self) {
-        // remove `todo!()`
+        // Update values in uniform buffer
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
