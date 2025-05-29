@@ -3,7 +3,7 @@ mod resources;
 mod texture;
 
 use cgmath::prelude::*;
-use model::{Model, Vertex};
+use model::{DrawModel, Model, Vertex};
 use texture::Texture;
 use wgpu::util::DeviceExt;
 use winit::{
@@ -592,11 +592,10 @@ impl<'a> State<'a> {
 
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
-        render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
 
-        use model::DrawModel;
-        render_pass.draw_mesh_instanced(&self.obj_model.meshes[0], 0..self.instances.len() as u32);
+        let mesh = &self.obj_model.meshes[0];
+        let material = &self.obj_model.materials[mesh.material];
+        render_pass.draw_mesh_instanced(mesh, material, 0..self.instances.len() as u32, &self.camera_bind_group);
 
         // Drop render_pass to finish encoder
         drop(render_pass);
