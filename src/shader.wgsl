@@ -22,6 +22,13 @@ struct VertexOutput {
     @location(0) tex_coords: vec2<f32>,
 }
 
+struct Light {
+    position: vec3<f32>,
+    color: vec3<f32>,
+};
+@group(2) @binding(0)
+var<uniform> light: Light;
+
 // Annotate as entry point for vertex shader
 @vertex
 fn vs_main(
@@ -48,5 +55,13 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_diffuse, s_diffuse, in.tex_coords);
+    let object_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
+
+    // We don't need (or want) much ambient light, so 0.1 is fine
+    let ambient_strenght = 0.1;
+    let ambient_color = light.color * ambient_strenght;
+
+    let result = ambient_color * object_color.xyz;
+
+    return vec4<f32>(result, object_color.a);
 }
