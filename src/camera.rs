@@ -1,10 +1,7 @@
 use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use cgmath::{InnerSpace, Matrix4, Point3, Rad, Vector3, perspective};
-use winit::{
-    dpi::PhysicalPosition,
-    event::MouseScrollDelta, keyboard::KeyCode
-};
+use winit::{dpi::PhysicalPosition, event::MouseScrollDelta, keyboard::KeyCode};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
@@ -107,12 +104,8 @@ impl CameraController {
         }
     }
 
-    pub fn process_keyboard(&mut self, key: KeyCode, pressed: bool) -> bool {
-        let amount = if pressed {
-            1.0
-        } else {
-            0.0
-        };
+    pub fn handle_key(&mut self, key: KeyCode, pressed: bool) -> bool {
+        let amount = if pressed { 1.0 } else { 0.0 };
         match key {
             KeyCode::KeyW | KeyCode::ArrowUp => {
                 self.amount_forward = amount;
@@ -147,11 +140,11 @@ impl CameraController {
         self.rotate_vertical = mouse_dy as f32;
     }
 
-    pub fn handle_mouse_scroll(&mut self, delta: &MouseScrollDelta) {
-        self.scroll = -match delta {
+    pub fn handle_scroll(&mut self, delta: &MouseScrollDelta) {
+        self.scroll = match delta {
             // I'm assuming a line is about 100 pixels
-            MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
-            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
+            MouseScrollDelta::LineDelta(_, scroll) => -scroll * 0.5,
+            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => -*scroll as f32,
         };
     }
 
