@@ -138,7 +138,7 @@ impl HdrPipeline {
     /// This renders the internal HDR texture to the [TextureView]
     /// supplied as parameter.
     pub fn process(&self, encoder: &mut wgpu::CommandEncoder, output: &wgpu::TextureView) {
-        let mut _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Hdr::process"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &output,
@@ -149,11 +149,11 @@ impl HdrPipeline {
                 },
             })],
             depth_stencil_attachment: None,
-            timestamp_writes: todo!(),
-            occlusion_query_set: todo!(),
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
-        _pass.set_pipeline(&self.pipeline);
-        _pass.set_bind_group(0, &self.bind_group, &[]);
-        _pass.draw(0..3, 0..1);
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, &self.bind_group, &[]);
+        pass.draw(0..3, 0..1);
     }
 }

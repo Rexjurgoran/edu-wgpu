@@ -183,16 +183,13 @@ fn create_render_pipeline(
             entry_point: Some("fs_main"),
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
-                blend: Some(wgpu::BlendState {
-                    alpha: wgpu::BlendComponent::REPLACE,
-                    color: wgpu::BlendComponent::REPLACE,
-                }),
+                blend: None,
                 write_mask: wgpu::ColorWrites::ALL,
             })],
             compilation_options: Default::default(),
         }),
         primitive: wgpu::PrimitiveState {
-            topology: topology,
+            topology,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: Some(wgpu::Face::Back),
@@ -234,7 +231,7 @@ impl State {
             #[cfg(not(target_arch = "wasm32"))]
             backends: wgpu::Backends::PRIMARY,
             #[cfg(target_arch = "wasm32")]
-            backends: wgpu::Backends::GL,
+            backends: wgpu::Backends::BROWSER_WEBGPU,
             ..Default::default()
         });
 
@@ -286,7 +283,7 @@ impl State {
             height: size.height,
             present_mode: surface_caps.present_modes[0],
             alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: vec![surface_format.add_srgb_suffix()],
             desired_maximum_frame_latency: 2,
         };
 
@@ -451,6 +448,8 @@ impl State {
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
+        let hdr = hdr::HdrPipeline::new(&device, &config);
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -470,7 +469,7 @@ impl State {
             create_render_pipeline(
                 &device,
                 &render_pipeline_layout,
-                config.format,
+                hdr.format(),
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc(), InstanceRaw::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
@@ -491,15 +490,13 @@ impl State {
             create_render_pipeline(
                 &device,
                 &layout,
-                config.format,
+                hdr.format(),
                 Some(texture::Texture::DEPTH_FORMAT),
                 &[model::ModelVertex::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
                 shader,
             )
         };
-
-        let hdr = hdr::HdrPipeline::new(&device, &config);
 
         Ok(Self {
             surface,
