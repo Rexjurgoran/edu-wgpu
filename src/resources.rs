@@ -338,6 +338,10 @@ impl HdrLoader {
         let num_workgroups = (dst_size + 15) / 16;
         pass.set_pipeline(&self.equirect_to_cubemap);
         pass.set_bind_group(0, &bind_group, &[]);
+
+        // Tells the GPU to run our code in batches. Each workgroup has a
+        // number of worker threads called invocations that run the code in
+        // parallel
         pass.dispatch_workgroups(num_workgroups, num_workgroups, 6);
 
         drop(pass);
