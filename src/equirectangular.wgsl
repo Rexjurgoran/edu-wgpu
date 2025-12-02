@@ -70,7 +70,7 @@ fn compute_equirect_to_cubemap(
     );
 
     // Get texture coords relative to cubemap face
-    let dst_dimension = vec2<f32>(textureDimensions(dst));
+    let dst_dimensions = vec2<f32>(textureDimensions(dst));
     let cube_uv = vec2<f32>(gid.xy) / dst_dimensions * 2.0 - 1.0;
 
     // Get spherical coordinate from cube_uv
