@@ -156,6 +156,8 @@ struct State {
     light_render_pipeline: wgpu::RenderPipeline,
     mouse_pressed: bool,
     hdr: hdr::HdrPipeline,
+    environment_bind_group: wgpu::BindGroup,
+    sky_pipeline: wgpu::RenderPipeline,
 }
 
 fn create_render_pipeline(
@@ -204,7 +206,7 @@ fn create_render_pipeline(
             format,
             depth_write_enabled: true,
             // Tells us when to discard a new pixel
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_compare: wgpu::CompareFunction::LessEqual,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
@@ -454,6 +456,63 @@ impl State {
             Some("Sky Texture"),
         )?;
 
+        let environment_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("environment_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::Cube,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+            });
+
+        let environment_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("environment_bind_group"),
+            layout: &environment_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&sky_texture.view()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(sky_texture.sampler()),
+                },
+            ],
+        });
+
+        // Render pipeline to render the skybox
+        let sky_pipeline = {
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Sky Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout, &environment_layout],
+                push_constant_ranges: &[],
+            });
+            let shader = wgpu::include_wgsl!("sky.wgsl");
+            create_render_pipeline(
+                &device,
+                &layout,
+                hdr.format(),
+                Some(texture::Texture::DEPTH_FORMAT),
+                &[],
+                wgpu::PrimitiveTopology::TriangleList,
+                shader,
+            )
+        };
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -526,6 +585,8 @@ impl State {
             light_render_pipeline,
             mouse_pressed: false,
             hdr,
+            environment_bind_group,
+            sky_pipeline,
         })
     }
 
