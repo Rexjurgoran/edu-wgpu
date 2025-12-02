@@ -7,7 +7,7 @@ struct Camera {
 }
 @group(0) 
 @binding(0)
-var<uniform> camera: Camera,
+var<uniform> camera: Camera;
 @group(1)
 @binding(0)
 var env_map: texture_cube<f32>;
@@ -20,7 +20,7 @@ struct VertexOutput {
     @location(0) clip_position: vec4<f32>,
 }
 
-@Vertex
+@vertex
 fn vs_main(
     @builtin(vertex_index) id: u32,
 ) -> VertexOutput {
@@ -32,7 +32,7 @@ fn vs_main(
     var out: VertexOutput;
 
     // Multiply the vector and shift it to cover 2 times the screen
-    
+
     // out.clip_position = vec4(uv * vec2(4.0, -4.0) + vec2(-1.0, 1.0), 0.0, 1.0);
     out.clip_position = vec4(uv * 4.0 - 1.0, 1.0, 1.0);
     out.frag_position = vec4(uv * 4.0 - 1.0, 1.0, 1.0);

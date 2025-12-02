@@ -1,3 +1,5 @@
+use crate::model::DrawModel;
+use crate::model::Vertex;
 mod camera;
 mod hdr;
 mod model;
@@ -7,7 +9,6 @@ mod texture;
 use std::{f32::consts::PI, sync::Arc};
 
 use cgmath::prelude::*;
-use model::{DrawModel, Model, Vertex};
 use texture::Texture;
 use wgpu::util::DeviceExt;
 use winit::{
@@ -18,7 +19,7 @@ use winit::{
     window::Window,
 };
 
-use crate::model::DrawLight;
+use crate::model::{DrawLight, Model};
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
 
@@ -26,20 +27,32 @@ const NUM_INSTANCES_PER_ROW: u32 = 10;
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
     view_position: [f32; 4],
+    view: [[f32; 4]; 4],
     view_proj: [[f32; 4]; 4],
+    inv_proj: [[f32; 4]; 4],
+    inv_view: [[f32; 4]; 4],
 }
 
 impl CameraUniform {
     fn new() -> Self {
         Self {
             view_position: [0.0; 4],
+            view: cgmath::Matrix4::identity().into(),
             view_proj: cgmath::Matrix4::identity().into(),
+            inv_proj: cgmath::Matrix4::identity().into(),
+            inv_view: cgmath::Matrix4::identity().into(),
         }
     }
 
     fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
         self.view_position = camera.position.to_homogeneous().into();
-        self.view_proj = (projection.calc_matrix() * camera.calc_matrix()).into()
+        let proj = projection.calc_matrix();
+        let view = camera.calc_matrix();
+        let view_proj = proj * view;
+        self.view = view.into();
+        self.view_proj = view_proj.into();
+        self.inv_proj = proj.invert().unwrap().into();
+        self.inv_view = view.transpose().into();
     }
 }
 
@@ -520,6 +533,7 @@ impl State {
                     &texture_bind_group_layout,
                     &camera_bind_group_layout,
                     &light_bind_group_layout,
+                    &environment_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -705,7 +719,13 @@ impl State {
                 0..self.instances.len() as u32,
                 &self.camera_bind_group,
                 &self.light_bind_group,
+                &self.environment_bind_group,
             );
+
+            render_pass.set_pipeline(&self.sky_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.environment_bind_group, &[]);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.hdr.process(&mut encoder, &view);
